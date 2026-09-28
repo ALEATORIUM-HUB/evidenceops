@@ -47,3 +47,20 @@ def test_invalid_entries(tmp_path):
     with pytest.raises(ValueError):
         Manifest(("bad",))
     assert scan(tmp_path) == Manifest(())
+
+
+def test_special_files_and_root_traversal_rejected(tmp_path):
+    import os
+
+    os.mkfifo(tmp_path / "pipe")
+    with pytest.raises(ValueError):
+        scan(tmp_path)
+    with pytest.raises(ValueError):
+        scan(tmp_path / "..")
+
+
+def test_manifest_copies_input_sequence():
+    entries = [ManifestEntry("sample", 0)]
+    manifest = Manifest(entries)
+    entries.clear()
+    assert len(manifest.entries) == 1

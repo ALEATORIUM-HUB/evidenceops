@@ -67,3 +67,12 @@ def test_duplicate_operations():
     operation = Operation(ManifestEntry("a", 0), OperationType.REPORT)
     with pytest.raises(ValidationError):
         ValidationGate().validate(ExecutionPlan((operation, operation), "2026-01-01T00:00:00Z"))
+
+
+def test_simulation_never_reads_or_executes_files():
+    plan = build_plan(Manifest((ManifestEntry("nonexistent", 99),)))
+    validation = ValidationGate()
+    validation.validate(plan)
+    result = DryRunGate().run(plan, validation)
+    assert result.plan.operations[0].entry.path == "nonexistent"
+    assert result.mutations_executed == 0

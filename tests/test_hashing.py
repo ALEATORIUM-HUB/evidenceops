@@ -57,3 +57,53 @@ def test_nested_file(tmp_path):
     (tmp_path / "nested" / "sample").write_bytes(b"")
     manifest = enrich_manifest(scan(tmp_path), tmp_path)
     assert verify_manifest(manifest, tmp_path) == {"nested/sample": "OK"}
+
+
+def test_parent_symlink_replacement_blocked(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    nested = root / "nested"
+    nested.mkdir()
+    (nested / "sample").write_bytes(b"abc")
+    manifest = enrich_manifest(scan(root), root)
+    nested.rename(root / "original")
+    nested.symlink_to("original", target_is_directory=True)
+    with pytest.raises(OSError):
+        verify_manifest(manifest, root)
+
+
+def test_nonregular_hash_rejected(tmp_path):
+    import os
+
+    os.mkfifo(tmp_path / "pipe")
+    with pytest.raises(ValueError):
+        sha256_file(tmp_path / "pipe")
+
+
+def test_change_during_hashing_fails_closed(tmp_path, monkeypatch):
+    import evidenceops.hashing as hashing
+
+    path = tmp_path / "sample"
+    path.write_bytes(b"abc")
+    original_fstat = hashing.os.fstat
+    calls = 0
+
+    def changing_fstat(fd):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            path.write_bytes(b"changed during read")
+        return original_fstat(fd)
+
+    monkeypatch.setattr(hashing.os, "fstat", changing_fstat)
+    with pytest.raises(RuntimeError, match="changed during hashing"):
+        sha256_file(path)
+
+
+def test_missing_nested_directory(tmp_path):
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "nested" / "sample").write_bytes(b"abc")
+    manifest = enrich_manifest(scan(tmp_path), tmp_path)
+    (tmp_path / "nested" / "sample").unlink()
+    (tmp_path / "nested").rmdir()
+    assert verify_manifest(manifest, tmp_path) == {"nested/sample": "MISSING"}

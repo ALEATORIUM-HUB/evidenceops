@@ -50,3 +50,38 @@ def test_incomplete_record_and_links_blocked(tmp_path):
         AppendOnlyLedger(link, new_run_id()).record("scan", {})
     with pytest.raises(OSError):
         AppendOnlyLedger(link, new_run_id()).read_all()
+
+
+def test_hardlink_ledger_rejected(tmp_path):
+    path = tmp_path / "events.jsonl"
+    path.write_bytes(b"")
+    (tmp_path / "alias").hardlink_to(path)
+    with pytest.raises(ValueError):
+        AppendOnlyLedger(path, new_run_id()).record("scan", {})
+    assert path.read_bytes() == b""
+
+
+def test_multiple_runs_remain_distinguishable(tmp_path):
+    path = tmp_path / "events.jsonl"
+    first, second = new_run_id(), new_run_id()
+    AppendOnlyLedger(path, first).record("scan", {})
+    other = AppendOnlyLedger(path, second)
+    other.record("scan", {})
+    assert [event["run_id"] for event in other.read_all()] == [first, second]
+
+
+def test_invalid_record_and_uuid_version(tmp_path):
+    path = tmp_path / "events.jsonl"
+    with pytest.raises(ValueError):
+        AppendOnlyLedger(path, "00000000-0000-1000-8000-000000000000")
+    path.write_text("[]\n")
+    with pytest.raises(ValueError):
+        AppendOnlyLedger(path, new_run_id()).read_all()
+
+
+def test_write_failure_propagates(tmp_path, monkeypatch):
+    import evidenceops.ledger as module
+
+    monkeypatch.setattr(module.os, "write", lambda *args: 0)
+    with pytest.raises(OSError, match="no progress"):
+        AppendOnlyLedger(tmp_path / "events.jsonl", new_run_id()).record("scan", {})
