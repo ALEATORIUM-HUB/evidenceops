@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — release candidate, not yet tagged
+## 0.1.0 — 2026-10-10
 
 - Deterministic frozen manifests with relative paths and symlink metadata.
 - Streaming SHA-256 enrichment and listed-entry verification.
@@ -11,5 +11,5 @@
 - CI configuration for Python 3.11, 3.12, and 3.13 on Ubuntu.
 
 Audited inputs remain read-only. The caller-selected evidence ledger is the only
-library output write. Public hosting, registry publication, and hosted CI results
-are not implied by this candidate entry.
+library output write. This release is hosted on GitHub and is not published to a
+package registry.
